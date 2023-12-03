@@ -75,6 +75,14 @@ module.exports = {
         },
         {
           type: "doc",
+          id: "recipes/integrate-ecommerce-stack",
+          label: "Integrate Ecommerce Stack",
+          customProps: {
+            iconName: "puzzle-solid",
+          },
+        },
+        {
+          type: "doc",
           id: "recipes/commerce-automation",
           label: "Commerce Automation",
           customProps: {
@@ -717,7 +725,7 @@ module.exports = {
         },
         {
           type: "doc",
-          id: "modules/carts-and-checkout/backend/add-fulfillment-provider",
+          id: "references/fulfillment/classes/AbstractFulfillmentService",
           label: "Backend: Create Fulfillment Provider",
         },
         {
@@ -2752,6 +2760,11 @@ module.exports = {
           id: "experimental/product/install-nodejs",
         },
         {
+          type: "doc",
+          label: "Examples",
+          id: "experimental/product/examples",
+        },
+        {
           type: "html",
           value: "References",
           customProps: {
@@ -3179,8 +3192,8 @@ module.exports = {
   pricingReference: [
     {
       type: "ref",
-      id: "modules/overview",
-      label: "Back to Commerce Modules",
+      id: "experimental/index",
+      label: "Back to Experimental Features",
       customProps: {
         sidebar_is_back_link: true,
         sidebar_icon: "back-arrow",
@@ -3213,8 +3226,8 @@ module.exports = {
   productReference: [
     {
       type: "ref",
-      id: "modules/overview",
-      label: "Back to Commerce Modules",
+      id: "experimental/index",
+      label: "Back to Experimental Features",
       customProps: {
         sidebar_is_back_link: true,
         sidebar_icon: "back-arrow",
