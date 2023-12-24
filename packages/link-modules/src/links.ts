@@ -22,4 +22,16 @@ export const LINKS = {
     "shippingProfileService",
     "profile_id"
   ),
+  ProductSalesChannel: composeLinkName(
+    Modules.PRODUCT,
+    "product_id",
+    "salesChannelService",
+    "sales_channel_id"
+  ),
+  CartSalesChannel: composeLinkName(
+    "cartService",
+    "cart_id",
+    "salesChannelService",
+    "sales_channel_id"
+  ),
 }
