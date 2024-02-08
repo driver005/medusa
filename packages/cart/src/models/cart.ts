@@ -5,9 +5,10 @@ import {
   Cascade,
   Collection,
   Entity,
+  ManyToOne,
   OnInit,
   OneToMany,
-  OneToOne,
+  OptionalProps,
   PrimaryKey,
   Property,
 } from "@mikro-orm/core"
@@ -18,94 +19,78 @@ import ShippingMethod from "./shipping-method"
 type OptionalCartProps =
   | "shipping_address"
   | "billing_address"
-  | DAL.EntityDateColumns // TODO: To be revisited when more clear
+  | DAL.EntityDateColumns
 
 @Entity({ tableName: "cart" })
 export default class Cart {
+  [OptionalProps]?: OptionalCartProps
+
   @PrimaryKey({ columnType: "text" })
   id: string
 
-  @Property({ columnType: "text", nullable: true })
-  region_id?: string | null
+  @Property({
+    columnType: "text",
+    nullable: true,
+    index: "IDX_cart_region_id",
+  })
+  region_id: string | null = null
 
   @Property({
     columnType: "text",
     nullable: true,
     index: "IDX_cart_customer_id",
   })
-  customer_id?: string | null
+  customer_id: string | null = null
+
+  @Property({
+    columnType: "text",
+    nullable: true,
+    index: "IDX_cart_sales_channel_id",
+  })
+  sales_channel_id: string | null = null
 
   @Property({ columnType: "text", nullable: true })
-  sales_channel_id?: string | null
+  email: string | null = null
 
-  @Property({ columnType: "text", nullable: true })
-  email?: string | null
-
-  @Property({ columnType: "text" })
+  @Property({ columnType: "text", index: "IDX_cart_curency_code" })
   currency_code: string
 
-  @OneToOne({
+  @Property({ columnType: "text", nullable: true })
+  shipping_address_id?: string | null
+
+  @ManyToOne({
     entity: () => Address,
-    joinColumn: "shipping_address_id",
-    cascade: [Cascade.REMOVE],
+    fieldName: "shipping_address_id",
     nullable: true,
+    index: "IDX_cart_shipping_address_id",
+    cascade: [Cascade.PERSIST],
   })
   shipping_address?: Address | null
 
-  @OneToOne({
+  @Property({ columnType: "text", nullable: true })
+  billing_address_id?: string | null
+
+  @ManyToOne({
     entity: () => Address,
-    joinColumn: "billing_address_id",
-    cascade: [Cascade.REMOVE],
+    fieldName: "billing_address_id",
     nullable: true,
+    index: "IDX_cart_billing_address_id",
+    cascade: [Cascade.PERSIST],
   })
   billing_address?: Address | null
 
   @Property({ columnType: "jsonb", nullable: true })
-  metadata?: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null = null
 
   @OneToMany(() => LineItem, (lineItem) => lineItem.cart, {
-    orphanRemoval: true,
+    cascade: [Cascade.REMOVE],
   })
   items = new Collection<LineItem>(this)
 
   @OneToMany(() => ShippingMethod, (shippingMethod) => shippingMethod.cart, {
-    orphanRemoval: true,
+    cascade: [Cascade.REMOVE],
   })
   shipping_methods = new Collection<ShippingMethod>(this)
-
-  /** COMPUTED PROPERTIES - START */
-
-  // compare_at_item_total?: number
-  // compare_at_item_subtotal?: number
-  // compare_at_item_tax_total?: number
-
-  // original_item_total: number
-  // original_item_subtotal: number
-  // original_item_tax_total: number
-
-  // item_total: number
-  // item_subtotal: number
-  // item_tax_total: number
-
-  // original_total: number
-  // original_subtotal: number
-  // original_tax_total: number
-
-  // total: number
-  // subtotal: number
-  // tax_total: number
-  // discount_total: number
-  // discount_tax_total: number
-
-  // shipping_total: number
-  // shipping_subtotal: number
-  // shipping_tax_total: number
-
-  // original_shipping_total: number
-  // original_shipping_subtotal: number
-  // original_shipping_tax_total: number
-
-  /** COMPUTED PROPERTIES - END */
 
   @Property({
     onCreate: () => new Date(),
@@ -121,6 +106,9 @@ export default class Cart {
     defaultRaw: "now()",
   })
   updated_at: Date
+
+  @Property({ columnType: "timestamptz", nullable: true })
+  deleted_at: Date | null = null
 
   @BeforeCreate()
   onCreate() {

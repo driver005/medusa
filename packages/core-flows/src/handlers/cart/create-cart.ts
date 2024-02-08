@@ -1,4 +1,4 @@
-import { AddressDTO, CartDTO, CustomerDTO, RegionDTO } from "@medusajs/types"
+import { AddressDTO, CustomerDTO, RegionDTO, legacy_CartDTO } from "@medusajs/types"
 import { WorkflowArguments } from "@medusajs/workflows-sdk"
 
 enum Aliases {
@@ -34,7 +34,7 @@ type HandlerInputData = {
 }
 
 type HandlerOutputData = {
-  cart: CartDTO
+  cart: legacy_CartDTO
 }
 
 export async function createCart({

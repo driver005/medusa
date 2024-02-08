@@ -1,6 +1,11 @@
 import { RepositoryTransformOptions } from "../common"
 import { Context } from "../shared-context"
-import { FindOptions } from "./index"
+import {
+  BaseFilterable,
+  FilterQuery as InternalFilterQuery,
+  FilterQuery,
+  FindOptions,
+} from "./index"
 
 /**
  * Data access layer (DAL) interface to implements for any repository service.
@@ -27,6 +32,8 @@ interface BaseRepositoryService<T = any> {
   ): Promise<TOutput>
 }
 
+type DtoBasedMutationMethods = "create" | "update"
+
 export interface RepositoryService<T = any> extends BaseRepositoryService<T> {
   find(options?: FindOptions<T>, context?: Context): Promise<T[]>
 
@@ -35,29 +42,34 @@ export interface RepositoryService<T = any> extends BaseRepositoryService<T> {
     context?: Context
   ): Promise<[T[], number]>
 
-  create(data: unknown[], context?: Context): Promise<T[]>
+  create(data: any[], context?: Context): Promise<T[]>
 
-  update(data: unknown[], context?: Context): Promise<T[]>
+  update(data: { entity; update }[], context?: Context): Promise<T[]>
 
-  delete(ids: string[], context?: Context): Promise<void>
+  delete(
+    idsOrPKs: FilterQuery<T> & BaseFilterable<FilterQuery<T>>,
+    context?: Context
+  ): Promise<void>
 
   /**
    * Soft delete entities and cascade to related entities if configured.
    *
-   * @param ids
+   * @param idsOrFilter
    * @param context
    *
    * @returns [T[], Record<string, string[]>] the second value being the map of the entity names and ids that were soft deleted
    */
   softDelete(
-    ids: string[],
+    idsOrFilter: string[] | InternalFilterQuery,
     context?: Context
   ): Promise<[T[], Record<string, unknown[]>]>
 
   restore(
-    ids: string[],
+    idsOrFilter: string[] | InternalFilterQuery,
     context?: Context
   ): Promise<[T[], Record<string, unknown[]>]>
+
+  upsert(data: any[], context?: Context): Promise<T[]>
 }
 
 export interface TreeRepositoryService<T = any>
@@ -81,7 +93,7 @@ export interface TreeRepositoryService<T = any>
 
 /**
  * @interface
- * 
+ *
  * An object that is used to specify an entity's related entities that should be soft-deleted when the main entity is soft-deleted.
  */
 export type SoftDeleteReturn<TReturnableLinkableKeys = string> = {
@@ -93,7 +105,7 @@ export type SoftDeleteReturn<TReturnableLinkableKeys = string> = {
 
 /**
  * @interface
- * 
+ *
  * An object that is used to specify an entity's related entities that should be restored when the main entity is restored.
  */
 export type RestoreReturn<TReturnableLinkableKeys = string> = {

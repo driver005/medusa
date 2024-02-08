@@ -1,11 +1,13 @@
 import { SqlEntityManager } from "@mikro-orm/postgresql"
 
 import { Currency } from "@models"
-import { CurrencyRepository } from "@repositories"
 import { CurrencyService } from "@services"
 
 import { createCurrencies } from "../../../__fixtures__/currency"
 import { MikroOrmWrapper } from "../../../utils"
+import { createMedusaContainer } from "@medusajs/utils"
+import { asValue } from "awilix"
+import ContainerLoader from "../../../../src/loaders/container"
 
 jest.setTimeout(30000)
 
@@ -34,13 +36,12 @@ describe("Currency Service", () => {
     await MikroOrmWrapper.setupDatabase()
     repositoryManager = await MikroOrmWrapper.forkManager()
 
-    const currencyRepository = new CurrencyRepository({
-      manager: repositoryManager,
-    })
+    const container = createMedusaContainer()
+    container.register("manager", asValue(repositoryManager))
 
-    service = new CurrencyService({
-      currencyRepository,
-    })
+    await ContainerLoader({ container })
+
+    service = container.resolve("currencyService")
 
     testManager = await MikroOrmWrapper.forkManager()
 
@@ -182,7 +183,7 @@ describe("Currency Service", () => {
         error = e
       }
 
-      expect(error.message).toEqual('"currencyCode" must be defined')
+      expect(error.message).toEqual("currency - code must be defined")
     })
 
     it("should return currency based on config select param", async () => {

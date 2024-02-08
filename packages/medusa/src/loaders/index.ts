@@ -15,6 +15,7 @@ import { track } from "medusa-telemetry"
 import { EOL } from "os"
 import requestIp from "request-ip"
 import { Connection } from "typeorm"
+import { v4 } from "uuid"
 import { MedusaContainer } from "../types/global"
 import apiLoader from "./api"
 import loadConfig from "./config"
@@ -49,7 +50,7 @@ async function loadLegacyModulesEntities(configModules, container) {
       continue
     }
 
-    let modulePath = isString(moduleConfig)
+    const modulePath = isString(moduleConfig)
       ? moduleConfig
       : (moduleConfig as InternalModuleDeclaration).resolve ??
         (definition.defaultPackage as string)
@@ -67,7 +68,7 @@ async function loadLegacyModulesEntities(configModules, container) {
         continue
       }
 
-      const module = await import(modulePath)
+      const module = await import(modulePath as string)
 
       if (module.default?.models) {
         module.default.models.map((model) =>
@@ -191,7 +192,8 @@ export default async ({
   // Add the registered services to the request scope
   expressApp.use((req: Request, res: Response, next: NextFunction) => {
     container.register({ manager: asValue(dataSource.manager) })
-    ;(req as any).scope = container.createScope()
+    req.scope = container.createScope() as MedusaContainer
+    req.requestId = (req.headers["x-request-id"] as string) ?? v4()
     next()
   })
 
@@ -215,7 +217,12 @@ export default async ({
 
   const apiActivity = Logger.activity(`Initializing API${EOL}`)
   track("API_INIT_STARTED")
-  await apiLoader({ container, app: expressApp, configModule })
+  await apiLoader({
+    container,
+    app: expressApp,
+    configModule,
+    featureFlagRouter,
+  })
   const apiAct = Logger.success(apiActivity, "API initialized") || {}
   track("API_INIT_COMPLETED", { duration: apiAct.duration })
 
