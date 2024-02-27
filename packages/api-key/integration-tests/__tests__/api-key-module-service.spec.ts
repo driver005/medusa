@@ -105,10 +105,12 @@ moduleIntegrationTestRunner({
 
         it("should allow for at most two tokens, where one is revoked", async function () {
           const firstApiKey = await service.create(createSecretKeyFixture)
-          await service.revoke({
-            id: firstApiKey.id,
-            revoked_by: "test",
-          })
+          await service.revoke(
+            { id: firstApiKey.id },
+            {
+              revoked_by: "test",
+            }
+          )
 
           await service.create(createSecretKeyFixture)
           const err = await service
@@ -123,8 +125,7 @@ moduleIntegrationTestRunner({
       describe("revoking API keys", () => {
         it("should have the revoked at and revoked by set when a key is revoked", async function () {
           const firstApiKey = await service.create(createSecretKeyFixture)
-          const revokedKey = await service.revoke({
-            id: firstApiKey.id,
+          const revokedKey = await service.revoke(firstApiKey.id, {
             revoked_by: "test",
           })
 
@@ -134,6 +135,27 @@ moduleIntegrationTestRunner({
               revoked_at: expect.any(Date),
             })
           )
+        })
+
+        it("should be able to revoke a key in the future", async function () {
+          const now = Date.parse("2021-01-01T00:00:00Z")
+          const hourInSec = 3600
+          jest.useFakeTimers().setSystemTime(now)
+
+          const createdKey = await service.create(createSecretKeyFixture)
+          const revokedKey = await service.revoke(createdKey.id, {
+            revoked_by: "test",
+            revoke_in: hourInSec,
+          })
+
+          expect(revokedKey).toEqual(
+            expect.objectContaining({
+              revoked_by: "test",
+              revoked_at: new Date(now + hourInSec * 1000),
+            })
+          )
+
+          jest.useRealTimers()
         })
 
         it("should do nothing if the revokal list is empty", async function () {
@@ -148,14 +170,12 @@ moduleIntegrationTestRunner({
 
         it("should not allow revoking an already revoked API key", async function () {
           const firstApiKey = await service.create(createSecretKeyFixture)
-          await service.revoke({
-            id: firstApiKey.id,
+          await service.revoke(firstApiKey.id, {
             revoked_by: "test",
           })
 
           const err = await service
-            .revoke({
-              id: firstApiKey.id,
+            .revoke(firstApiKey.id, {
               revoked_by: "test2",
             })
             .catch((e) => e)
@@ -170,8 +190,7 @@ moduleIntegrationTestRunner({
         it("should update the name successfully", async function () {
           const createdApiKey = await service.create(createSecretKeyFixture)
 
-          const updatedApiKey = await service.update({
-            id: createdApiKey.id,
+          const updatedApiKey = await service.update(createdApiKey.id, {
             title: "New Name",
           })
           expect(updatedApiKey.title).toEqual("New Name")
@@ -180,8 +199,7 @@ moduleIntegrationTestRunner({
         it("should not reflect any updates on other fields", async function () {
           const createdApiKey = await service.create(createSecretKeyFixture)
 
-          const updatedApiKey = await service.update({
-            id: createdApiKey.id,
+          const updatedApiKey = await service.update(createdApiKey.id, {
             title: createdApiKey.title,
             revoked_by: "test",
             revoked_at: new Date(),
@@ -204,6 +222,54 @@ moduleIntegrationTestRunner({
 
           const apiKeysInDatabase = await service.list()
           expect(apiKeysInDatabase).toHaveLength(0)
+        })
+      })
+
+      describe("authenticating with API keys", () => {
+        it("should authenticate a secret key successfully", async function () {
+          const createdApiKey = await service.create(createSecretKeyFixture)
+          const authenticated = await service.authenticate(createdApiKey.token)
+
+          expect(authenticated).toBeTruthy()
+          expect(authenticated.title).toEqual(createSecretKeyFixture.title)
+        })
+        it("should authenticate with a token to be revoked in the future", async function () {
+          const createdApiKey = await service.create(createSecretKeyFixture)
+
+          // We simulate setting the revoked_at in the future here
+          jest.useFakeTimers().setSystemTime(new Date().setFullYear(3000))
+          await service.revoke(createdApiKey.id, {
+            revoked_by: "test",
+          })
+          jest.useRealTimers()
+
+          const authenticated = await service.authenticate(createdApiKey.token)
+          expect(authenticated).toBeTruthy()
+          expect(authenticated.title).toEqual(createdApiKey.title)
+        })
+
+        it("should not authenticate a publishable key", async function () {
+          const createdApiKey = await service.create(
+            createPublishableKeyFixture
+          )
+          const authenticated = await service.authenticate(createdApiKey.token)
+
+          expect(authenticated).toBeFalsy()
+        })
+        it("should not authenticate with a non-existent token", async function () {
+          const createdApiKey = await service.create(createSecretKeyFixture)
+          const authenticated = await service.authenticate("some-token")
+
+          expect(authenticated).toBeFalsy()
+        })
+        it("should not authenticate with a revoked token", async function () {
+          const createdApiKey = await service.create(createSecretKeyFixture)
+          await service.revoke(createdApiKey.id, {
+            revoked_by: "test",
+          })
+          const authenticated = await service.authenticate(createdApiKey.token)
+
+          expect(authenticated).toBeFalsy()
         })
       })
 

@@ -43,6 +43,17 @@ module.exports = {
       scope: "internal",
       resources: "shared",
       resolve: "@medusajs/auth",
+      options: {
+        providers: [
+          {
+            name: "emailpass",
+            scopes: {
+              admin: {},
+              store: {},
+            },
+          },
+        ],
+      },
     },
     [Modules.USER]: {
       scope: "internal",
@@ -101,6 +112,11 @@ module.exports = {
       scope: "internal",
       resources: "shared",
       resolve: "@medusajs/region",
+    },
+    [Modules.API_KEY]: {
+      scope: "internal",
+      resources: "shared",
+      resolve: "@medusajs/api-key",
     },
   },
 }
