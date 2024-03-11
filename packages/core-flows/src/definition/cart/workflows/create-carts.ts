@@ -14,13 +14,14 @@ import {
   getVariantsStep,
   validateVariantsExistStep,
 } from "../steps"
+import { refreshCartPromotionsStep } from "../steps/refresh-cart-promotions"
+import { updateTaxLinesStep } from "../steps/update-tax-lines"
 import { prepareLineItemData } from "../utils/prepare-line-item-data"
+import { refreshPaymentCollectionForCartStep } from "./refresh-payment-collection"
 
 // TODO: The UpdateLineItemsWorkflow are missing the following steps:
 // - Confirm inventory exists (inventory module)
 // - Refresh/delete shipping methods (fulfillment module)
-// - Refresh/create line item adjustments (promotion module)
-// - Update payment sessions (payment module)
 
 export const createCartWorkflowId = "create-cart"
 export const createCartWorkflow = createWorkflow(
@@ -83,26 +84,30 @@ export const createCartWorkflow = createWorkflow(
       }
     )
 
-    const variants = getVariantsStep({
-      filter: { id: variantIds },
-      config: {
-        select: [
-          "id",
-          "title",
-          "sku",
-          "barcode",
-          "product.id",
-          "product.title",
-          "product.description",
-          "product.subtitle",
-          "product.thumbnail",
-          "product.type",
-          "product.collection",
-          "product.handle",
-        ],
-        relations: ["product"],
-      },
-    })
+    const variants = getVariantsStep(
+      transform({ variantIds }, (data) => {
+        return {
+          filter: { id: data.variantIds },
+          config: {
+            select: [
+              "id",
+              "title",
+              "sku",
+              "barcode",
+              "product.id",
+              "product.title",
+              "product.description",
+              "product.subtitle",
+              "product.thumbnail",
+              "product.type",
+              "product.collection",
+              "product.handle",
+            ],
+            relations: ["product"],
+          },
+        }
+      })
+    )
 
     const lineItems = transform({ priceSets, input, variants }, (data) => {
       const items = (data.input.items ?? []).map((item) => {
@@ -127,8 +132,16 @@ export const createCartWorkflow = createWorkflow(
     })
 
     const carts = createCartsStep([cartToCreate])
-
     const cart = transform({ carts }, (data) => data.carts?.[0])
+
+    refreshCartPromotionsStep({
+      id: cart.id,
+      promo_codes: input.promo_codes,
+    })
+    updateTaxLinesStep({ cart_or_cart_id: cart.id })
+    refreshPaymentCollectionForCartStep({
+      cart_id: cart.id,
+    })
 
     return cart
   }
