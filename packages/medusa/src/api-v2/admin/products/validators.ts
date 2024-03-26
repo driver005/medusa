@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNumber,
   IsObject,
   IsOptional,
@@ -81,6 +82,13 @@ export class AdminGetProductsParams extends extendedFindParamsMixin({
   price_list_id?: string[]
 
   /**
+   * Filter products by associated sales channel IDs.
+   */
+  @IsOptional()
+  @IsArray()
+  sales_channel_id?: string[]
+
+  /**
    * Filter products by their associated product collection's ID.
    */
   @IsArray()
@@ -105,12 +113,6 @@ export class AdminGetProductsParams extends extendedFindParamsMixin({
   @IsOptional()
   @IsObject()
   variants?: Record<any, any>
-
-  // /**
-  //  * Filter products by their associated sales channels' ID.
-  //  */
-  // @FeatureFlagDecorators(SalesChannelFeatureFlag.key, [IsOptional(), IsArray()])
-  // sales_channel_id?: string[]
 
   // /**
   //  * Filter products by their associated discount condition's ID.
@@ -537,13 +539,10 @@ export class AdminPostProductsProductVariantsReq {
   @IsOptional()
   metadata?: Record<string, unknown>
 
-  // TODO: Add on next iteration, adding temporary field for now
-  // @IsArray()
-  // @ValidateNested({ each: true })
-  // @Type(() => ProductVariantPricesCreateReq)
-  // prices: ProductVariantPricesCreateReq[]
   @IsArray()
-  prices: any[]
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantPricesCreateReq)
+  prices: ProductVariantPricesCreateReq[]
 
   @IsOptional()
   @IsObject()
@@ -619,12 +618,11 @@ export class AdminPostProductsProductVariantsVariantReq {
   @IsOptional()
   metadata?: Record<string, unknown>
 
-  // TODO: Deal with in next iteration
-  // @IsArray()
-  // @IsOptional()
-  // @ValidateNested({ each: true })
-  // @Type(() => ProductVariantPricesUpdateReq)
-  // prices?: ProductVariantPricesUpdateReq[]
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantPricesUpdateReq)
+  prices?: ProductVariantPricesUpdateReq[]
 
   @IsOptional()
   @IsObject()
@@ -678,4 +676,42 @@ export class ProductTypeReq {
    */
   @IsString()
   value: string
+}
+
+// TODO: Add support for rules
+export class ProductVariantPricesCreateReq {
+  @IsString()
+  currency_code: string
+
+  @IsInt()
+  amount: number
+
+  @IsOptional()
+  @IsInt()
+  min_quantity?: number
+
+  @IsOptional()
+  @IsInt()
+  max_quantity?: number
+}
+
+export class ProductVariantPricesUpdateReq {
+  @IsString()
+  @IsOptional()
+  id?: string
+
+  @IsString()
+  @IsOptional()
+  currency_code?: string
+
+  @IsInt()
+  amount: number
+
+  @IsOptional()
+  @IsInt()
+  min_quantity?: number
+
+  @IsOptional()
+  @IsInt()
+  max_quantity?: number
 }
