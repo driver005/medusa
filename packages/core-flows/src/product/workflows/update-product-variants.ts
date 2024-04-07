@@ -11,7 +11,7 @@ import { getVariantPricingLinkStep } from "../steps/get-variant-pricing-link"
 type UpdateProductVariantsStepInput = {
   selector: ProductTypes.FilterableProductVariantProps
   update: ProductTypes.UpdateProductVariantDTO & {
-    prices?: PricingTypes.CreateMoneyAmountDTO[]
+    prices?: Partial<PricingTypes.CreateMoneyAmountDTO>[]
   }
 }
 
@@ -58,7 +58,7 @@ export const updateProductVariantsWorkflow = createWorkflow(
 
         return {
           selector: {
-            ids: data.variantPriceSetLinks.map((link) => link.price_set_id),
+            id: data.variantPriceSetLinks.map((link) => link.price_set_id),
           } as PricingTypes.FilterablePriceSetProps,
           update: {
             prices: data.input.update.prices,
@@ -78,11 +78,11 @@ export const updateProductVariantsWorkflow = createWorkflow(
       },
       (data) => {
         return data.updatedVariants.map((variant, i) => {
-          const linkForVariant = data.variantPriceSetLinks.find(
+          const linkForVariant = data.variantPriceSetLinks?.find(
             (link) => link.variant_id === variant.id
           )
 
-          const priceSetForVariant = data.updatedPriceSets.find(
+          const priceSetForVariant = data.updatedPriceSets?.find(
             (priceSet) => priceSet.id === linkForVariant?.price_set_id
           )
 
