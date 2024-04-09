@@ -5,9 +5,10 @@
 import {
   CampaignDTO,
   CurrencyDTO,
-  CustomerDTO,
+  CustomerGroupDTO,
   InviteDTO,
   PaymentProviderDTO,
+  PriceListDTO,
   ProductCategoryDTO,
   ProductCollectionDTO,
   ProductDTO,
@@ -38,10 +39,6 @@ type DeleteRes = {
 
 // Auth
 export type EmailPassRes = { token: string }
-
-// Customers
-export type CustomerRes = { customer: CustomerDTO }
-export type CustomerListRes = { customers: CustomerDTO[] } & ListRes
 
 // Promotions
 export type PromotionRes = { promotion: PromotionDTO }
@@ -142,3 +139,15 @@ export type ProductCollectionListRes = {
   collections: ProductCollectionDTO[]
 } & ListRes
 export type ProductCollectionDeleteRes = DeleteRes
+
+// Price Lists
+export type PriceListRes = { price_list: PriceListDTO }
+export type PriceListListRes = { price_lists: PriceListDTO[] } & ListRes
+export type PriceListDeleteRes = DeleteRes
+
+// Customer Groups
+export type CustomerGroupRes = { customer_group: CustomerGroupDTO }
+export type CustomerGroupListRes = {
+  customer_groups: CustomerGroupDTO[]
+} & ListRes
+export type CustomerGroupDeleteRes = DeleteRes
