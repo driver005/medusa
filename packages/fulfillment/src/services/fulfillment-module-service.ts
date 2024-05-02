@@ -14,21 +14,22 @@ import {
   UpdateServiceZoneDTO,
 } from "@medusajs/types"
 import {
+  arrayDifference,
   EmitEvents,
   FulfillmentUtils,
+  getSetDifference,
   InjectManager,
   InjectTransactionManager,
+  isString,
   MedusaContext,
   MedusaError,
+  Modules,
   ModulesSdkUtils,
-  arrayDifference,
-  getSetDifference,
-  isString,
   promiseAll,
-  Modules
 } from "@medusajs/utils"
 import {
   Fulfillment,
+  FulfillmentProvider,
   FulfillmentSet,
   GeoZone,
   ServiceZone,
@@ -37,10 +38,10 @@ import {
   ShippingOptionType,
   ShippingProfile,
 } from "@models"
-import { isContextValid, validateRules } from "@utils"
+import { isContextValid, validateAndNormalizeRules } from "@utils"
 import { entityNameToLinkableKeysMap, joinerConfig } from "../joiner-config"
-import FulfillmentProviderService from "./fulfillment-provider"
 import { UpdateShippingOptionsInput } from "../types/service"
+import FulfillmentProviderService from "./fulfillment-provider"
 
 const generateMethodForModels = [
   ServiceZone,
@@ -49,6 +50,7 @@ const generateMethodForModels = [
   ShippingProfile,
   ShippingOptionRule,
   ShippingOptionType,
+  FulfillmentProvider,
   // Not adding Fulfillment to not auto generate the methods under the hood and only provide the methods we want to expose8
 ]
 
@@ -86,6 +88,7 @@ export default class FulfillmentModuleService<
       ShippingProfile: { dto: FulfillmentTypes.ShippingProfileDTO }
       ShippingOptionRule: { dto: FulfillmentTypes.ShippingOptionRuleDTO }
       ShippingOptionType: { dto: FulfillmentTypes.ShippingOptionTypeDTO }
+      FulfillmentProvider: { dto: FulfillmentTypes.FulfillmentProviderDTO }
     }
   >(FulfillmentSet, generateMethodForModels, entityNameToLinkableKeysMap)
   implements IFulfillmentModuleService
@@ -132,6 +135,51 @@ export default class FulfillmentModuleService<
 
   __joinerConfig(): ModuleJoinerConfig {
     return joinerConfig
+  }
+
+  private setupShippingOptionsConfig_(
+    filters,
+    config
+  ):
+    | FulfillmentTypes.FilterableShippingOptionForContextProps["context"]
+    | undefined {
+    const fieldIdx = config.relations?.indexOf("shipping_options_context")
+    const shouldCalculatePrice = fieldIdx > -1
+
+    const shippingOptionsContext = filters.context ?? {}
+
+    delete filters.context
+
+    if (!shouldCalculatePrice) {
+      return
+    }
+
+    // cleanup virtual field "shipping_options_context"
+    config.relations?.splice(fieldIdx, 1)
+
+    return shippingOptionsContext
+  }
+
+  @InjectManager("baseRepository_")
+  // @ts-ignore
+  async listShippingOptions(
+    filters: FulfillmentTypes.FilterableShippingOptionForContextProps = {},
+    config: FindConfig<FulfillmentTypes.ShippingOptionDTO> = {},
+    @MedusaContext() sharedContext: Context = {}
+  ): Promise<FulfillmentTypes.ShippingOptionDTO[]> {
+    const optionsContext = this.setupShippingOptionsConfig_(filters, config)
+
+    if (optionsContext) {
+      filters.context = optionsContext
+
+      return await this.listShippingOptionsForContext(
+        filters,
+        config,
+        sharedContext
+      )
+    }
+
+    return await super.listShippingOptions(filters, config, sharedContext)
   }
 
   @InjectManager("baseRepository_")
@@ -340,7 +388,7 @@ export default class FulfillmentModuleService<
       | FulfillmentTypes.CreateServiceZoneDTO,
     @MedusaContext() sharedContext: Context = {}
   ): Promise<TServiceZoneEntity | TServiceZoneEntity[]> {
-    let data_ = Array.isArray(data) ? data : [data]
+    const data_ = Array.isArray(data) ? data : [data]
 
     if (!data_.length) {
       return []
@@ -399,7 +447,7 @@ export default class FulfillmentModuleService<
       | FulfillmentTypes.CreateShippingOptionDTO,
     @MedusaContext() sharedContext: Context = {}
   ): Promise<TShippingOptionEntity | TShippingOptionEntity[]> {
-    let data_ = Array.isArray(data) ? data : [data]
+    const data_ = Array.isArray(data) ? data : [data]
 
     if (!data_.length) {
       return []
@@ -407,7 +455,7 @@ export default class FulfillmentModuleService<
 
     const rules = data_.flatMap((d) => d.rules).filter(Boolean)
     if (rules.length) {
-      validateRules(rules as Record<string, unknown>[])
+      validateAndNormalizeRules(rules as Record<string, unknown>[])
     }
 
     const createdShippingOptions = await this.shippingOptionService_.create(
@@ -552,7 +600,7 @@ export default class FulfillmentModuleService<
       return []
     }
 
-    validateRules(data_ as unknown as Record<string, unknown>[])
+    validateAndNormalizeRules(data_ as unknown as Record<string, unknown>[])
 
     const createdShippingOptionRules =
       await this.shippingOptionRuleService_.create(data_, sharedContext)
@@ -1145,14 +1193,33 @@ export default class FulfillmentModuleService<
         shippingOption
       )
 
-      const existingRulesMap = new Map(
-        existingRules.map((rule) => [rule.id, rule])
-      )
+      const existingRulesMap: Map<
+        string,
+        FulfillmentTypes.UpdateShippingOptionRuleDTO | ShippingOptionRule
+      > = new Map(existingRules.map((rule) => [rule.id, rule]))
 
       const updatedRules = shippingOption.rules
-      const updatedRuleIds = updatedRules
-        .map((r) => "id" in r && r.id)
-        .filter((id): id is string => !!id)
+        .map((rule) => {
+          if ("id" in rule) {
+            const existingRule = (existingRulesMap.get(rule.id) ??
+              {}) as FulfillmentTypes.UpdateShippingOptionRuleDTO
+
+            const ruleData: FulfillmentTypes.UpdateShippingOptionRuleDTO = {
+              ...existingRule,
+              ...rule,
+            }
+
+            existingRulesMap.set(rule.id, ruleData)
+            return ruleData
+          }
+
+          return
+        })
+        .filter(Boolean) as FulfillmentTypes.UpdateShippingOptionRuleDTO[]
+
+      validateAndNormalizeRules(updatedRules)
+
+      const updatedRuleIds = updatedRules.map((r) => "id" in r && r.id)
 
       const toDeleteRuleIds = arrayDifference(
         updatedRuleIds,
@@ -1163,19 +1230,9 @@ export default class FulfillmentModuleService<
         ruleIdsToDelete.push(...toDeleteRuleIds)
       }
 
-      const newRules = updatedRules
-        .map((rule) => {
-          if (!("id" in rule)) {
-            return rule
-          }
-          return
-        })
-        .filter(Boolean)
-
-      validateRules(newRules as Record<string, unknown>[])
-
       shippingOption.rules = shippingOption.rules.map((rule) => {
         if (!("id" in rule)) {
+          validateAndNormalizeRules([rule])
           return rule
         }
         return existingRulesMap.get(rule.id)!
@@ -1379,7 +1436,7 @@ export default class FulfillmentModuleService<
       return []
     }
 
-    validateRules(data_ as unknown as Record<string, unknown>[])
+    validateAndNormalizeRules(data_ as unknown as Record<string, unknown>[])
 
     const updatedShippingOptionRules =
       await this.shippingOptionRuleService_.update(data_, sharedContext)

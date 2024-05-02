@@ -5,17 +5,20 @@ import {
   TransactionStep,
 } from "@medusajs/orchestration"
 import { ContainerLike, Context, MedusaContainer } from "@medusajs/types"
-import { InjectSharedContext, MedusaContext, isString } from "@medusajs/utils"
+import { InjectSharedContext, isString, MedusaContext } from "@medusajs/utils"
 import {
-  MedusaWorkflow,
-  ReturnWorkflow,
-  resolveValue,
   type FlowRunOptions,
+  MedusaWorkflow,
+  resolveValue,
+  ReturnWorkflow,
 } from "@medusajs/workflows-sdk"
 import { ulid } from "ulid"
 import { InMemoryDistributedTransactionStorage } from "../utils"
 
-export type WorkflowOrchestratorRunOptions<T> = FlowRunOptions<T> & {
+export type WorkflowOrchestratorRunOptions<T> = Omit<
+  FlowRunOptions<T>,
+  "container"
+> & {
   transactionId?: string
   container?: ContainerLike
 }
@@ -483,11 +486,20 @@ export class WorkflowOrchestratorService {
 
         notify({ eventType: "onStepFailure", step, errors })
       },
+      onStepAwaiting: ({ step, transaction }) => {
+        customEventHandlers?.onStepAwaiting?.({ step, transaction })
+
+        notify({ eventType: "onStepAwaiting", step })
+      },
 
       onCompensateStepSuccess: ({ step, transaction }) => {
         const stepName = step.definition.action!
         const response = transaction.getContext().compensate[stepName]
-        customEventHandlers?.onStepSuccess?.({ step, transaction, response })
+        customEventHandlers?.onCompensateStepSuccess?.({
+          step,
+          transaction,
+          response,
+        })
 
         notify({ eventType: "onCompensateStepSuccess", step, response })
       },
