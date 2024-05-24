@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express"
-import type { Customer, User } from "../models"
 
 import {
   MedusaContainer,
@@ -60,15 +59,16 @@ export interface MedusaRequest<Body = unknown>
   pricingContext?: MedusaPricingContext
 }
 
+export interface AuthContext {
+  actor_id: string
+  actor_type: string
+  auth_identity_id: string
+  app_metadata: Record<string, unknown>
+}
+
 export interface AuthenticatedMedusaRequest<Body = never>
   extends MedusaRequest<Body> {
-  user: (User | Customer) & { customer_id?: string; userId?: string } // TODO: Remove this property when v2 is released
-  auth: {
-    actor_id: string
-    auth_user_id: string
-    app_metadata: Record<string, any>
-    scope: string
-  }
+  auth_context: AuthContext
 }
 
 export type MedusaResponse<Body = unknown> = Response<Body>

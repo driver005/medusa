@@ -3,14 +3,13 @@
 import React, { useMemo, useState } from "react"
 import clsx from "clsx"
 import { HighlightProps, Highlight, themes } from "prism-react-renderer"
-import { CopyButton, Tooltip, LegacyLink } from "@/components"
+import { ApiRunner, CopyButton, Tooltip, Link } from "@/components"
 import { useColorMode } from "@/providers"
 import { ExclamationCircle, PlaySolid, SquareTwoStack } from "@medusajs/icons"
 import { CodeBlockHeader, CodeBlockHeaderMeta } from "./Header"
 import { CodeBlockLine } from "./Line"
 import { ApiAuthType, ApiDataOptions, ApiMethod } from "types"
 import { CSSTransition } from "react-transition-group"
-import { ApiRunner } from "./ApiRunner"
 import { GITHUB_ISSUES_PREFIX } from "../.."
 
 export type Highlight = {
@@ -69,7 +68,10 @@ export const CodeBlock = ({
   const { colorMode } = useColorMode()
   const [showTesting, setShowTesting] = useState(false)
   const canShowApiTesting = useMemo(
-    () => apiTesting && rest.testApiMethod && rest.testApiUrl,
+    () =>
+      apiTesting !== undefined &&
+      rest.testApiMethod !== undefined &&
+      rest.testApiUrl !== undefined,
     [apiTesting, rest]
   )
 
@@ -269,8 +271,7 @@ export const CodeBlock = ({
                       tokens.length > 1 && "px-[6px] pb-[6px]"
                     )}
                   >
-                    {/* TODO replace with Link once we move away from Docusaurus */}
-                    <LegacyLink
+                    <Link
                       href={`${GITHUB_ISSUES_PREFIX}&title=${encodeURIComponent(
                         `Docs(Code Issue): `
                       )}`}
@@ -284,7 +285,7 @@ export const CodeBlock = ({
                       rel="noreferrer"
                     >
                       <ExclamationCircle className={clsx(iconColor)} />
-                    </LegacyLink>
+                    </Link>
                   </Tooltip>
                 )}
                 {!noCopy && (

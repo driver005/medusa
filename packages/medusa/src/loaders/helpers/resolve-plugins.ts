@@ -4,8 +4,8 @@ import fs from "fs"
 import { sync as existsSync } from "fs-exists-cached"
 import { createRequireFromPath } from "medusa-core-utils"
 import path from "path"
-import { MEDUSA_PROJECT_NAME } from "../plugins"
 
+export const MEDUSA_PROJECT_NAME = "project-plugin"
 function createPluginId(name: string): string {
   return name
 }
@@ -107,14 +107,22 @@ function resolvePlugin(pluginName: string): {
 export function getResolvedPlugins(
   rootDirectory: string,
   configModule: ConfigModule,
-  extensionDirectoryPath = "dist",
   isMedusaProject = false
 ): undefined | PluginDetails[] {
-  const { plugins } = configModule
-
   if (isMedusaProject) {
+    /**
+     * Grab directory for loading resources inside a starter kit from
+     * the medusa-config file.
+     *
+     * When using ts-node we will read resources from "src" directory
+     * otherwise from "dist" directory.
+     */
+    const extensionDirectoryPath = process[
+      Symbol.for("ts-node.register.instance")
+    ]
+      ? "src"
+      : "dist"
     const extensionDirectory = path.join(rootDirectory, extensionDirectoryPath)
-
     return [
       {
         resolve: extensionDirectory,
@@ -126,7 +134,8 @@ export function getResolvedPlugins(
     ]
   }
 
-  const resolved = plugins.map((plugin) => {
+  const extensionDirectoryPath = "dist"
+  const resolved = configModule?.plugins.map((plugin) => {
     if (isString(plugin)) {
       return resolvePlugin(plugin)
     }

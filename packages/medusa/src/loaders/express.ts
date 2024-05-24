@@ -1,18 +1,21 @@
+import { ConfigModule } from "@medusajs/types"
 import createStore from "connect-redis"
 import cookieParser from "cookie-parser"
 import { Express } from "express"
 import session from "express-session"
-import morgan from "morgan"
 import Redis from "ioredis"
-import { ConfigModule } from "../types/global"
+import morgan from "morgan"
 
 type Options = {
   app: Express
   configModule: ConfigModule
 }
 
-export default async ({ app, configModule }: Options): Promise<{
-  app: Express,
+export default async ({
+  app,
+  configModule,
+}: Options): Promise<{
+  app: Express
   shutdown: () => Promise<void>
 }> => {
   let sameSite: string | boolean = false
@@ -25,14 +28,14 @@ export default async ({ app, configModule }: Options): Promise<{
     sameSite = "none"
   }
 
-  const { cookie_secret, session_options } = configModule.projectConfig
+  const { http, session_options } = configModule.projectConfig
   const sessionOpts = {
     name: session_options?.name ?? "connect.sid",
     resave: session_options?.resave ?? true,
     rolling: session_options?.rolling ?? false,
     saveUninitialized: session_options?.saveUninitialized ?? true,
     proxy: true,
-    secret: session_options?.secret ?? cookie_secret,
+    secret: session_options?.secret ?? http?.cookieSecret,
     cookie: {
       sameSite,
       secure,
@@ -46,7 +49,7 @@ export default async ({ app, configModule }: Options): Promise<{
   if (configModule?.projectConfig?.redis_url) {
     const RedisStore = createStore(session)
     redisClient = new Redis(
-      configModule.projectConfig.redis_url, 
+      configModule.projectConfig.redis_url,
       configModule.projectConfig.redis_options ?? {}
     )
     sessionOpts.store = new RedisStore({

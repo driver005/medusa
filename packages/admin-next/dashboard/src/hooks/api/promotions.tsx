@@ -1,4 +1,5 @@
 import { AdminGetPromotionsParams } from "@medusajs/medusa"
+import { AdminRuleValueOptionsListResponse } from "@medusajs/types"
 import {
   QueryKey,
   useMutation,
@@ -7,7 +8,7 @@ import {
   UseQueryOptions,
 } from "@tanstack/react-query"
 import { client } from "../../lib/client"
-import { queryClient } from "../../lib/medusa"
+import { queryClient } from "../../lib/query-client"
 import { queryKeysFactory } from "../../lib/query-key-factory"
 import {
   BatchAddPromotionRulesReq,
@@ -23,8 +24,8 @@ import {
   PromotionRuleAttributesListRes,
   PromotionRuleOperatorsListRes,
   PromotionRulesListRes,
-  PromotionRuleValuesListRes,
 } from "../../types/api-responses"
+import { campaignsQueryKeys } from "./campaigns"
 
 const PROMOTIONS_QUERY_KEY = "promotions" as const
 export const promotionsQueryKeys = {
@@ -35,10 +36,11 @@ export const promotionsQueryKeys = {
     ruleType,
   ],
   listRuleAttributes: (ruleType: string) => [PROMOTIONS_QUERY_KEY, ruleType],
-  listRuleValues: (ruleType: string, ruleValue: string) => [
+  listRuleValues: (ruleType: string, ruleValue: string, query: object) => [
     PROMOTIONS_QUERY_KEY,
     ruleType,
     ruleValue,
+    query,
   ],
   listRuleOperators: () => [PROMOTIONS_QUERY_KEY],
 }
@@ -141,19 +143,25 @@ export const usePromotionRuleAttributes = (
 export const usePromotionRuleValues = (
   ruleType: string,
   ruleValue: string,
+  query?: Record<string, any>,
   options?: Omit<
     UseQueryOptions<
-      PromotionListRes,
+      AdminRuleValueOptionsListResponse,
       Error,
-      PromotionRuleValuesListRes,
+      AdminRuleValueOptionsListResponse,
       QueryKey
     >,
     "queryFn" | "queryKey"
   >
 ) => {
   const { data, ...rest } = useQuery({
-    queryKey: promotionsQueryKeys.listRuleValues(ruleType, ruleValue),
-    queryFn: async () => client.promotions.listRuleValues(ruleType, ruleValue),
+    queryKey: promotionsQueryKeys.listRuleValues(
+      ruleType,
+      ruleValue,
+      query || {}
+    ),
+    queryFn: async () =>
+      client.promotions.listRuleValues(ruleType, ruleValue, query),
     ...options,
   })
 
@@ -185,6 +193,7 @@ export const useCreatePromotion = (
     mutationFn: (payload) => client.promotions.create(payload),
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: promotionsQueryKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: campaignsQueryKeys.lists() })
       options?.onSuccess?.(data, variables, context)
     },
     ...options,

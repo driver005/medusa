@@ -1,17 +1,12 @@
+import { ConfigModule } from "@medusajs/types"
 import { promiseAll, wrapHandler } from "@medusajs/utils"
 import cors from "cors"
 import { Router, json, text, urlencoded, type Express } from "express"
 import { readdir } from "fs/promises"
 import { parseCorsOrigins } from "medusa-core-utils"
 import { extname, join, sep } from "path"
-import {
-  authenticate,
-  authenticateCustomer,
-  errorHandler,
-  requireCustomerAuthentication,
-} from "../../../api/middlewares"
-import { ConfigModule } from "../../../types/global"
 import { MedusaRequest, MedusaResponse } from "../../../types/routing"
+import { errorHandler } from "../../../utils/middlewares"
 import logger from "../../logger"
 import {
   AsyncRouteHandler,
@@ -38,7 +33,7 @@ const log = ({
     return
   }
 
-  logger.info(message)
+  logger.debug(message)
 }
 
 /**
@@ -533,7 +528,7 @@ export class RoutesLoader {
             const childPath = join(dirPath, entry.name)
 
             if (entry.isDirectory()) {
-              return this.createRoutesMap({
+              return await this.createRoutesMap({
                 dirPath: childPath,
                 parentPath: parentPath ?? dirPath,
               })
@@ -568,8 +563,6 @@ export class RoutesLoader {
     }
 
     if (mostSpecificConfig?.bodyParser) {
-      const sizeLimit = mostSpecificConfig?.bodyParser?.sizeLimit
-
       this.router[method.toLowerCase()](
         path,
         ...getBodyParserMiddleware(mostSpecificConfig?.bodyParser)
@@ -610,7 +603,7 @@ export class RoutesLoader {
           descriptor.route,
           cors({
             origin: parseCorsOrigins(
-              this.configModule.projectConfig.admin_cors || ""
+              this.configModule.projectConfig.http.adminCors
             ),
             credentials: true,
           })
@@ -625,7 +618,7 @@ export class RoutesLoader {
           descriptor.route,
           cors({
             origin: parseCorsOrigins(
-              this.configModule.projectConfig.auth_cors || ""
+              this.configModule.projectConfig.http.authCors
             ),
             credentials: true,
           })
@@ -640,32 +633,11 @@ export class RoutesLoader {
           descriptor.route,
           cors({
             origin: parseCorsOrigins(
-              this.configModule.projectConfig.store_cors || ""
+              this.configModule.projectConfig.http.storeCors
             ),
             credentials: true,
           })
         )
-      }
-
-      if (descriptor.config.shouldAppendCustomer) {
-        /**
-         * Add the customer to the request object
-         */
-        this.router.use(descriptor.route, authenticateCustomer())
-      }
-
-      if (descriptor.config.shouldRequireCustomerAuth) {
-        /**
-         * Require the customer to be authenticated
-         */
-        this.router.use(descriptor.route, requireCustomerAuthentication())
-      }
-
-      if (descriptor.config.shouldRequireAdminAuth) {
-        /**
-         * Require the admin to be authenticated
-         */
-        this.router.use(descriptor.route, authenticate())
       }
 
       for (const route of routes) {

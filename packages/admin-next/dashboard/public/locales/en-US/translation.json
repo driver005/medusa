@@ -19,6 +19,7 @@
     "is": "is",
     "timeline": "Timeline",
     "success": "Success",
+    "warning": "Warning",
     "error": "Error",
     "select": "Select",
     "selected": "Selected",
@@ -41,14 +42,13 @@
     "typeToConfirm": "Please type {val} to confirm:",
     "noResultsTitle": "No results",
     "noResultsMessage": "Try changing the filters or search query",
+    "noSearchResults": "No search results",
+    "noSearchResultsFor": "No search results for <0>'{{query}}'</0>",
     "noRecordsTitle": "No records",
     "noRecordsMessage": "There are no records to show",
     "unsavedChangesTitle": "Are you sure you want to leave this page?",
     "unsavedChangesDescription": "You have unsaved changes that will be lost if you leave this page.",
-    "includesTaxTooltip": "Enter the total amount including tax. The net amount excluding tax will be automatically calculated and saved.",
-    "timeline": "Timeline",
-    "success": "Success",
-    "error": "Error"
+    "includesTaxTooltip": "Enter the total amount including tax. The net amount excluding tax will be automatically calculated and saved."
   },
   "validation": {
     "mustBeInt": "The value must be a whole number.",
@@ -62,6 +62,7 @@
   },
   "actions": {
     "save": "Save",
+    "select": "Select",
     "saveAsDraft": "Save as draft",
     "publish": "Publish",
     "create": "Create",
@@ -69,7 +70,10 @@
     "remove": "Remove",
     "revoke": "Revoke",
     "cancel": "Cancel",
+    "enable": "Enable",
+    "disable": "Disable",
     "complete": "Complete",
+    "viewDetails": "View details",
     "back": "Back",
     "close": "Close",
     "continue": "Continue",
@@ -154,10 +158,32 @@
       "required": "New owner is required."
     }
   },
+  "sales_channels": {
+    "availableIn": "Available in <0>{{x}}</0> of <1>{{y}}</1> sales channels"
+  },
   "products": {
     "domain": "Products",
-    "createProductTitle": "Create Product",
-    "createProductHint": "Create a new product to sell in your store.",
+    "create": {
+      "header": "Create Product",
+      "hint": "Create a new product to sell in your store.",
+      "tabs": {
+        "details": "Details",
+        "variants": "Variants"
+      },
+      "variants": {
+        "header": "Variants",
+        "productVariants": {
+          "label": "Product variants",
+          "hint": "Variants left unchecked won't be created. This ranking will affect how the variants are ranked in your frontend.",
+          "alert": "Add options to create variants."
+        },
+        "productOptions": {
+          "label": "Product options",
+          "hint": "Define the options for the product, e.g. color, size, etc."
+        }
+      },
+      "successToast": "Product {{title}} was successfully created."
+    },
     "deleteWarning": "You are about to delete the product {{title}}. This action cannot be undone.",
     "variants": "Variants",
     "attributes": "Attributes",
@@ -184,7 +210,6 @@
       "noMediaLabel": "The product has no associated media."
     },
     "discountableHint": "When unchecked discounts will not be applied to this product.",
-    "availableInSalesChannels": "Available in <0>{{x}}</0> of <1>{{y}}</1> sales channels",
     "noSalesChannels": "Not available in any sales channels",
     "variantCount_one": "{{count}} variant",
     "variantCount_other": "{{count}} variants",
@@ -291,10 +316,12 @@
     "options": {
       "header": "Options",
       "edit": {
-        "header": "Edit Option"
+        "header": "Edit Option",
+        "successToast": "Option {{title}} was successfully updated."
       },
       "create": {
-        "header": "Create Option"
+        "header": "Create Option",
+        "successToast": "Option {{title}} was successfully created."
       }
     },
     "toasts": {
@@ -344,11 +371,11 @@
     "associatedVariants": "Associated variants",
     "manageLocations": "Manage locations",
     "deleteWarning": "You are about to delete an inventory item. This action cannot be undone.",
-    "reservation": { 
+    "reservation": {
       "header": "Reservation of {{itemName}}",
       "editItemDetails": "Edit item details",
       "orderID": "Order ID",
-      "description": "Description", 
+      "description": "Description",
       "location": "Location",
       "inStockAtLocation": "In stock at this location",
       "availableAtLocation": "Available at this location",
@@ -502,8 +529,20 @@
       "unfulfilledItems": "Unfulfilled Items",
       "statusLabel": "Fulfillment status",
       "statusTitle": "Fulfillment Status",
-      "awaitingFullfillmentBadge": "Awaiting fulfillment",
+      "fulfillItems": "Fulfill items",
+      "awaitingFulfillmentBadge": "Awaiting fulfillment",
       "number": "Fulfillment #{{number}}",
+      "itemsToFulfill": "Items to fulfill",
+      "create": "Create Fulfillment",
+      "available": "Available",
+      "inStock": "In stock",
+      "itemsToFulfillDesc": "Choose items and quantities to fulfill",
+      "locationDescription": "Choose which location you want to fulfill items from.",
+      "error": {
+        "wrongQuantity": "Only one item is available for fulfillment",
+        "wrongQuantity_other": "Quantity should be a number between 1 and {{number}}",
+        "noItems": "No items to fulfill."
+      },
       "status": {
         "notFulfilled": "Not fulfilled",
         "partiallyFulfilled": "Partially fulfilled",
@@ -514,6 +553,11 @@
         "returned": "Returned",
         "canceled": "Canceled",
         "requiresAction": "Requires action"
+      },
+      "toast": {
+        "created": "Fulfillment created successfully",
+        "canceled": "Fulfillment successfully canceled",
+        "fulfillmentShipped": "Cannot cancel an already shipped fulfillment"
       },
       "trackingLabel": "Tracking",
       "shippingFromLabel": "Shipping from",
@@ -623,15 +667,23 @@
     }
   },
   "shipping": {
-    "title": "Shipping & Delivery",
-    "domain": "Shipping & Delivery",
+    "title": "Locations & Shipping",
+    "domain": "Locations & Shipping",
     "description": "Choose where you ship and how much you charge for shipping at checkout. Define shipping options specific for your locations.",
+    "createLocation": "Create location",
+    "createLocationDetailsHint": "Specify the details of the location.",
+    "deleteLocation": "Delete location",
     "from": "Shipping from",
     "add": "Add shipping",
     "connectProvider": "Connect provider",
     "addZone": "Add shipping zone",
     "enablePickup": "Enable pickup",
     "enableDelivery": "Enable delivery",
+    "deleteLocation": {
+      "label": "Delete Location",
+      "confirm": "Are you sure you want to delete {{name}} location",
+      "success": "{{name}} location successfully deleted"
+    },
     "noRecords": {
       "action": "Add Location",
       "title": "No inventory locations",
@@ -645,18 +697,25 @@
     },
     "fulfillmentSet": {
       "placeholder": "Not covered by any shipping zones.",
+      "salesChannels": "Connected Sales Channels",
       "delete": "Delete shipping",
+      "disableWarning": "Are you sure that you wnat to disable \"{{name}}\"? This will delete all assocciated service zones and shipping options.",
       "create": {
         "title": "Add service zone for {{fulfillmentSet}}"
       },
+      "toast": {
+        "disable": "\"{{name}}\" disabled"
+      },
       "addZone": "Add service zone",
       "pickup": {
-        "title": "Pickup in",
-        "enable": "Enable pickup"
+        "title": "Pick up",
+        "enable": "Enable pickup",
+        "offers": "Offers pick up in"
       },
       "delivery": {
-        "title": "Shipping to",
-        "enable": "Enable delivery"
+        "title": "Shipping",
+        "enable": "Enable delivery",
+        "offers": "Offers shippping to"
       }
     },
     "serviceZone": {
@@ -666,12 +725,23 @@
         "description": "A service zone is a geographical region that can be shipped to from a specific location. You can later on  add any number of shipping options to this zone. ",
         "zoneName": "Zone name"
       },
+      "edit": {
+        "title": "Edit Service Zone"
+      },
+      "editAreasTitle": "Manage {{zone}} areas",
+      "deleteWarning": "Are you sure you want to delete \"{{name}}\". This will also delete all assocciated shipping options.",
+      "toast": {
+        "delete": "Zone \"{{name}}\" deleted successfully."
+      },
+      "manageAreas": "Manage areas",
       "editPrices": "Edit prices",
       "editOption": "Edit option",
       "optionsLength_one": "shipping option",
       "optionsLength_other": "shipping options",
+      "returnOptionsLength_one": "return option",
+      "returnOptionsLength_other": "return options",
       "shippingOptionsPlaceholder": "Not covered by any shipping options.",
-      "addShippingOptions": "Add shipping options",
+      "addOption": "Add option",
       "shippingOptions": "Shipping options",
       "returnOptions": "Return options",
       "areas": {
@@ -683,7 +753,7 @@
     },
     "shippingOptions": {
       "create": {
-        "title": "Create shipping options for {{zone}}",
+        "title": "Create a shipping option for {{zone}}",
         "subtitle": "General information",
         "description": "To start selling, all you need is a name and a price",
         "details": "Details",
@@ -691,12 +761,31 @@
         "allocation": "Shipping amount",
         "fixed": "Fixed",
         "fixedDescription": "Shipping option's price is always the same amount.",
-        "enable": "Enable in store",
-        "enableDescription": "Enable or disable the shipping option visiblity in store",
+        "enable": "Show publicly",
+        "enableDescription": "When disabled, the shipping option can only be applied by admins.",
         "calculated": "Calculated",
         "calculatedDescription": "Shipping option's price is calculated by the fulfillment provider.",
         "profile": "Shipping profile"
+      },
+      "deleteWarning": "Are you sure you want to delete \"{{name}}\"?",
+      "toast": {
+        "delete": "Shipping option \"{{name}}\" deleted successfully."
+      },
+      "inStore": "Store",
+      "edit": {
+        "title": "Edit Shipping Option",
+        "provider": "Fulfillment provider"
       }
+    },
+    "returnOptions": {
+      "create": {
+        "title": "Create a return option for {{zone}}"
+      }
+    },
+    "salesChannels": {
+      "title": "Connected Sales Channels",
+      "placeholder": "No connected channels yet.",
+      "connectChannels": "Connect Channels"
     }
   },
   "shippingProfile": {
@@ -840,6 +929,9 @@
   },
   "promotions": {
     "domain": "Promotions",
+    "sections": {
+      "details": "Promotion Details"
+    },
     "fields": {
       "method": "Method",
       "type": "Type",
@@ -849,6 +941,9 @@
       "allocation": "Allocation",
       "addCondition": "Add condition",
       "clearAll": "Clear all",
+      "amount": {
+        "tooltip": "Select the currency code to enable setting the amount"
+      },
       "conditions": {
         "rules": {
           "title": "Who can use this code?",
@@ -883,6 +978,9 @@
     "addToCampaign": {
       "title": "Add Promotion To Campaign"
     },
+    "campaign_currency": {
+      "tooltip": "Currency is carried over from the promotion. Change it on the promotions tab."
+    },
     "form": {
       "required": "Required",
       "and": "AND",
@@ -895,6 +993,10 @@
         "new": {
           "title": "New Campaign",
           "description": "Would you like to create a new campaign with this promotion?"
+        },
+        "none": {
+          "title": "Without Campaign",
+          "description": "Proceed without associating promotion with campaign"
         }
       },
       "status": {
@@ -959,21 +1061,74 @@
   "campaigns": {
     "domain": "Campaigns",
     "details": "Campaign details",
+    "status": {
+      "active": "active",
+      "expired": "expired",
+      "scheduled": "scheduled"
+    },
+    "delete": {
+      "title": "Are you sure?",
+      "description": "You are about to delete the campaign '{{name}}'. This action cannot be undone.",
+      "successToast": "Campaign '{{name}}' was successfully created."
+    },
+    "edit": {
+      "header": "Edit Campaign",
+      "successToast": "Campaign '{{name}}' was successfully updated."
+    },
+    "create": {
+      "hint": "Create a promotional campaign",
+      "header": "Create Campaign",
+      "successToast": "Campaign '{{name}}' was successfully created."
+    },
     "fields": {
       "name": "Name",
       "identifier": "Identifier",
       "start_date": "Start date",
-      "end_date": "End date"
+      "end_date": "End date",
+      "total_spend": "Budget spent",
+      "total_used": "Budget used",
+      "budget_limit": "Budget limit",
+      "campaign_id": {
+        "hint": "A list of campaigns with the same currency code as the promotion"
+      }
     },
     "budget": {
+      "create": {
+        "hint": "Create a budget for the campaign",
+        "header": "Campaign Budget"
+      },
       "details": "Campaign budget",
       "fields": {
         "type": "Type",
         "currency": "Currency",
         "limit": "Limit",
         "used": "Used"
+      },
+      "type": {
+        "spend": {
+          "title": "Spend",
+          "description": "Limit usage based on a currency value"
+        },
+        "usage": {
+          "title": "Usage",
+          "description": "Limit usage based on how many times its used"
+        }
       }
-    }
+    },
+    "promotions": {
+      "remove": {
+        "title": "Remove promotion from campaign",
+        "description": "You are about to remove {{count}} promotion(s) from the campaign. This action cannot be undone."
+      },
+      "alreadyAdded": "This promotion has already been added to the campaign.",
+      "alreadyAddedDiffCampaign": "This promotion has already been added to a different campaign ({{name}}).",
+      "currencyMismatch": "Currency of the promotion and campaign doesn't match",
+      "toast": {
+        "success": "Successfully added {{count}} promotion(s) to campaign"
+      }
+    },
+    "deleteCampaignWarning": "You are about to delete the campaign {{name}}. This action cannot be undone.",
+    "totalSpend": "<0>{{amount}}</0> <1>{{currency}}</1>"
   },
   "pricing": {
     "domain": "Pricing",
@@ -1195,10 +1350,8 @@
   },
   "locations": {
     "domain": "Locations",
-    "createLocation": "Create location",
     "editLocation": "Edit location",
     "addSalesChannels": "Add sales channels",
-    "detailsHint": "Specify the details of the location.",
     "noLocationsFound": "No locations found",
     "selectLocations": "Select locations that stock the item.",
     "deleteLocationWarning": "You are about to delete the location {{name}}. This action cannot be undone.",
@@ -1388,6 +1541,7 @@
     "scheduled": "Scheduled",
     "expired": "Expired",
     "active": "Active",
+    "enabled": "Enabled",
     "disabled": "Disabled"
   },
   "fields": {
@@ -1532,7 +1686,8 @@
     "unitPrice": "Unit price",
     "startDate": "Start date",
     "endDate": "End date",
-    "draft": "Draft"
+    "draft": "Draft",
+    "values": "Values"
   },
   "metadata": {
     "warnings": {

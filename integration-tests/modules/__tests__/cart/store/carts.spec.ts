@@ -4,10 +4,13 @@ import {
   Modules,
   RemoteLink,
 } from "@medusajs/modules-sdk"
+import PaymentModuleService from "@medusajs/payment/dist/services/payment-module"
 import {
+  IApiKeyModuleService,
   ICartModuleService,
   ICustomerModuleService,
   IFulfillmentModuleService,
+  IPaymentModuleService,
   IPricingModuleService,
   IProductModuleService,
   IPromotionModuleService,
@@ -16,18 +19,22 @@ import {
   ITaxModuleService,
 } from "@medusajs/types"
 import {
+  ContainerRegistrationKeys,
+  MedusaError,
   PromotionRuleOperator,
   PromotionType,
   RuleOperator,
 } from "@medusajs/utils"
 import { medusaIntegrationTestRunner } from "medusa-test-utils"
-import adminSeeder from "../../../../helpers/admin-seeder"
+import { createAdminUser } from "../../../../helpers/create-admin-user"
+import { seedStorefrontDefaults } from "../../../../helpers/seed-storefront-defaults"
 import { createAuthenticatedCustomer } from "../../../helpers/create-authenticated-customer"
 import { setupTaxStructure } from "../../fixtures"
 
 jest.setTimeout(100000)
 
 const env = { MEDUSA_FF_MEDUSA_V2: true }
+const adminHeaders = { headers: { "x-medusa-access-token": "test_token" } }
 
 medusaIntegrationTestRunner({
   env,
@@ -42,10 +49,16 @@ medusaIntegrationTestRunner({
       let pricingModule: IPricingModuleService
       let remoteLink: RemoteLink
       let promotionModule: IPromotionModuleService
+      let apiKeyModule: IApiKeyModuleService
       let taxModule: ITaxModuleService
       let fulfillmentModule: IFulfillmentModuleService
+      let remoteLinkService
+      let regionService: IRegionModuleService
+      let paymentService: IPaymentModuleService
 
       let defaultRegion
+      let region
+      let store
 
       beforeAll(async () => {
         appContainer = getContainer()
@@ -55,26 +68,29 @@ medusaIntegrationTestRunner({
         customerModule = appContainer.resolve(ModuleRegistrationName.CUSTOMER)
         productModule = appContainer.resolve(ModuleRegistrationName.PRODUCT)
         pricingModule = appContainer.resolve(ModuleRegistrationName.PRICING)
+        apiKeyModule = appContainer.resolve(ModuleRegistrationName.API_KEY)
         remoteLink = appContainer.resolve(LinkModuleUtils.REMOTE_LINK)
         promotionModule = appContainer.resolve(ModuleRegistrationName.PROMOTION)
         taxModule = appContainer.resolve(ModuleRegistrationName.TAX)
+        regionService = appContainer.resolve(ModuleRegistrationName.REGION)
+        paymentService = appContainer.resolve(ModuleRegistrationName.PAYMENT)
         fulfillmentModule = appContainer.resolve(
           ModuleRegistrationName.FULFILLMENT
+        )
+        remoteLinkService = appContainer.resolve(
+          ContainerRegistrationKeys.REMOTE_LINK
         )
       })
 
       beforeEach(async () => {
-        await adminSeeder(dbConnection)
+        await createAdminUser(dbConnection, adminHeaders, appContainer)
 
-        // Here, so we don't have to create a region for each test
-        defaultRegion = await regionModule.create({
-          name: "Default Region",
-          currency_code: "dkk",
-        })
+        const { region } = await seedStorefrontDefaults(appContainer, "dkk")
+        defaultRegion = region
       })
 
       describe("POST /store/carts", () => {
-        it.skip("should create a cart", async () => {
+        it("should create a cart", async () => {
           const region = await regionModule.create({
             name: "US",
             currency_code: "usd",
@@ -332,6 +348,158 @@ medusaIntegrationTestRunner({
           )
         })
 
+        it("throws if publishable key is not associated with sales channel", async () => {
+          const salesChannel = await scModule.create({
+            name: "Retail Store",
+          })
+
+          const salesChannel2 = await scModule.create({
+            name: "Webshop",
+          })
+
+          const pubKey = await apiKeyModule.create({
+            title: "Test key",
+            type: "publishable",
+            created_by: "test",
+          })
+
+          await api.post(
+            `/admin/api-keys/${pubKey.id}/sales-channels`,
+            {
+              add: [salesChannel2.id],
+            },
+            adminHeaders
+          )
+
+          const errorRes = await api
+            .post(
+              "/store/carts",
+              {
+                sales_channel_id: salesChannel.id,
+              },
+              {
+                headers: { "x-publishable-api-key": pubKey.token },
+              }
+            )
+            .catch((e) => e)
+
+          expect(errorRes.response.status).toEqual(400)
+          expect(errorRes.response.data).toEqual({
+            errors: expect.arrayContaining([
+              `Sales channel ID in payload ${salesChannel.id} is not associated with the Publishable API Key in the header.`,
+            ]),
+            message:
+              "Provided request body contains errors. Please check the data and retry the request",
+          })
+        })
+
+        it("throws if publishable key has multiple associated sales channels", async () => {
+          const salesChannel = await scModule.create({
+            name: "Retail Store",
+          })
+
+          const salesChannel2 = await scModule.create({
+            name: "Webshop",
+          })
+
+          const pubKey = await apiKeyModule.create({
+            title: "Test key",
+            type: "publishable",
+            created_by: "test",
+          })
+
+          await api.post(
+            `/admin/api-keys/${pubKey.id}/sales-channels`,
+            {
+              add: [salesChannel.id, salesChannel2.id],
+            },
+            adminHeaders
+          )
+
+          const errorRes = await api
+            .post(
+              "/store/carts",
+              {},
+              {
+                headers: { "x-publishable-api-key": pubKey.token },
+              }
+            )
+            .catch((e) => e)
+
+          expect(errorRes.response.status).toEqual(400)
+          expect(errorRes.response.data).toEqual({
+            errors: expect.arrayContaining([
+              `Cannot assign sales channel to cart. The Publishable API Key in the header has multiple associated sales channels. Please provide a sales channel ID in the request body.`,
+            ]),
+            message:
+              "Provided request body contains errors. Please check the data and retry the request",
+          })
+        })
+
+        it("should create cart with sales channel if pub key does not have any scopes defined", async () => {
+          const salesChannel = await scModule.create({
+            name: "Retail Store",
+          })
+
+          const pubKey = await apiKeyModule.create({
+            title: "Test key",
+            type: "publishable",
+            created_by: "test",
+          })
+
+          const successRes = await api.post(
+            "/store/carts",
+            {
+              sales_channel_id: salesChannel.id,
+            },
+            {
+              headers: { "x-publishable-api-key": pubKey.token },
+            }
+          )
+
+          expect(successRes.status).toEqual(200)
+          expect(successRes.data.cart).toEqual(
+            expect.objectContaining({
+              sales_channel_id: salesChannel.id,
+            })
+          )
+        })
+
+        it("should create cart with sales channel associated with pub key", async () => {
+          const salesChannel = await scModule.create({
+            name: "Retail Store",
+          })
+
+          const pubKey = await apiKeyModule.create({
+            title: "Test key",
+            type: "publishable",
+            created_by: "test",
+          })
+
+          await api.post(
+            `/admin/api-keys/${pubKey.id}/sales-channels`,
+            {
+              add: [salesChannel.id],
+            },
+            adminHeaders
+          )
+
+          const successRes = await api.post(
+            "/store/carts",
+            {},
+            {
+              headers: { "x-publishable-api-key": pubKey.token },
+            }
+          )
+
+          expect(successRes.status).toEqual(200)
+          expect(successRes.data.cart).toEqual(
+            expect.objectContaining({
+              sales_channel_id: salesChannel.id,
+            })
+          )
+        })
+
         it("should respond 400 bad request on unknown props", async () => {
           await expect(
             api.post(`/store/carts`, {
@@ -366,6 +534,7 @@ medusaIntegrationTestRunner({
               target_type: "items",
               allocation: "each",
               value: 300,
+              currency_code: "usd",
               apply_to_quantity: 1,
               max_quantity: 1,
               target_rules: targetRules,
@@ -379,6 +548,7 @@ medusaIntegrationTestRunner({
               type: "fixed",
               target_type: "items",
               allocation: "across",
+              currency_code: "usd",
               value: 1000,
               apply_to_quantity: 1,
               target_rules: targetRules,
@@ -1064,6 +1234,7 @@ medusaIntegrationTestRunner({
               allocation: "across",
               value: 300,
               apply_to_quantity: 2,
+              currency_code: "usd",
               target_rules: [
                 {
                   attribute: "product_id",
@@ -1188,7 +1359,7 @@ medusaIntegrationTestRunner({
         })
       })
 
-      describe("POST /store/carts/:id/payment-collections", () => {
+      describe("POST /store/payment-collections", () => {
         it("should create a payment collection for the cart", async () => {
           const region = await regionModule.create({
             name: "US",
@@ -1200,21 +1371,91 @@ medusaIntegrationTestRunner({
             region_id: region.id,
           })
 
-          const response = await api.post(
-            `/store/carts/${cart.id}/payment-collections`
-          )
+          const response = await api.post(`/store/payment-collections`, {
+            region_id: region.id,
+            cart_id: cart.id,
+            amount: 0,
+            currency_code: cart.currency_code,
+          })
 
           expect(response.status).toEqual(200)
-          expect(response.data.cart).toEqual(
+          expect(response.data.payment_collection).toEqual(
             expect.objectContaining({
-              id: cart.id,
-              currency_code: "usd",
-              payment_collection: expect.objectContaining({
-                id: expect.any(String),
-                amount: 0,
-              }),
+              id: expect.any(String),
+              amount: 0,
             })
           )
+        })
+
+        it("should return an existing payment collection for the cart", async () => {
+          const region = await regionModule.create({
+            name: "US",
+            currency_code: "usd",
+          })
+
+          const cart = await cartModule.create({
+            currency_code: "usd",
+            region_id: region.id,
+          })
+
+          const firstCollection = (
+            await api.post(`/store/payment-collections`, {
+              region_id: region.id,
+              cart_id: cart.id,
+              amount: 0,
+              currency_code: cart.currency_code,
+            })
+          ).data.payment_collection
+
+          const response = await api.post(`/store/payment-collections`, {
+            region_id: region.id,
+            cart_id: cart.id,
+            amount: 0,
+            currency_code: cart.currency_code,
+          })
+
+          expect(response.status).toEqual(200)
+          expect(response.data.payment_collection.id).toEqual(
+            firstCollection.id
+          )
+        })
+
+        it("should create a new payment collection for a new cart", async () => {
+          const region = await regionModule.create({
+            name: "US",
+            currency_code: "usd",
+          })
+
+          const firstCart = await cartModule.create({
+            currency_code: "usd",
+            region_id: region.id,
+          })
+
+          const secondCart = await cartModule.create({
+            currency_code: "usd",
+            region_id: region.id,
+          })
+
+          const firstCollection = (
+            await api.post(`/store/payment-collections`, {
+              region_id: region.id,
+              cart_id: firstCart.id,
+              amount: 0,
+              currency_code: firstCart.currency_code,
+            })
+          ).data.payment_collection
+
+          const secondCollection = (
+            await api.post(`/store/payment-collections`, {
+              region_id: region.id,
+              cart_id: secondCart.id,
+              amount: 0,
+              currency_code: secondCart.currency_code,
+            })
+          ).data.payment_collection
+
+          expect(firstCollection.id).toBeTruthy()
+          expect(firstCollection.id).not.toEqual(secondCollection.id)
         })
       })
 
@@ -1354,8 +1595,13 @@ medusaIntegrationTestRunner({
             rules: [
               {
                 operator: RuleOperator.EQ,
-                attribute: "shipping_address.country_code",
-                value: "us",
+                attribute: "is_return",
+                value: "false",
+              },
+              {
+                operator: RuleOperator.EQ,
+                attribute: "enabled_in_store",
+                value: "true",
               },
             ],
           })
@@ -1387,6 +1633,403 @@ medusaIntegrationTestRunner({
               ],
             })
           )
+        })
+      })
+
+      describe("POST /store/carts/:id/complete", () => {
+        let salesChannel
+        let product
+        let shippingProfile
+        let fulfillmentSet
+        let shippingOption
+        let paymentCollection
+        let paymentSession
+        let stockLocation
+        let inventoryItem
+
+        beforeEach(async () => {
+          await setupTaxStructure(taxModule)
+
+          region = await regionService.create({
+            name: "Test region",
+            countries: ["US"],
+            currency_code: "usd",
+          })
+
+          salesChannel = (
+            await api.post(
+              "/admin/sales-channels",
+              { name: "first channel", description: "channel" },
+              adminHeaders
+            )
+          ).data.sales_channel
+
+          product = (
+            await api.post(
+              "/admin/products",
+              {
+                title: "Test fixture",
+                tags: [{ value: "123" }, { value: "456" }],
+                options: [
+                  { title: "size", values: ["large", "small"] },
+                  { title: "color", values: ["green"] },
+                ],
+                variants: [
+                  {
+                    title: "Test variant",
+                    prices: [
+                      {
+                        currency_code: "usd",
+                        amount: 100,
+                      },
+                    ],
+                    options: {
+                      size: "large",
+                      color: "green",
+                    },
+                  },
+                ],
+              },
+              adminHeaders
+            )
+          ).data.product
+
+          stockLocation = (
+            await api.post(
+              `/admin/stock-locations`,
+              { name: "test location" },
+              adminHeaders
+            )
+          ).data.stock_location
+
+          inventoryItem = (
+            await api.post(
+              `/admin/inventory-items`,
+              {
+                sku: "12345",
+              },
+              adminHeaders
+            )
+          ).data.inventory_item
+
+          await api.post(
+            `/admin/inventory-items/${inventoryItem.id}/location-levels`,
+            {
+              location_id: stockLocation.id,
+              stocked_quantity: 10,
+            },
+            adminHeaders
+          )
+
+          await api.post(
+            `/admin/stock-locations/${stockLocation.id}/sales-channels`,
+            { add: [salesChannel.id] },
+            adminHeaders
+          )
+
+          shippingProfile = await fulfillmentModule.createShippingProfiles({
+            name: "Test",
+            type: "default",
+          })
+
+          fulfillmentSet = await fulfillmentModule.create({
+            name: "Test",
+            type: "test-type",
+            service_zones: [
+              {
+                name: "Test",
+                geo_zones: [{ type: "country", country_code: "us" }],
+              },
+            ],
+          })
+
+          await remoteLinkService.create([
+            {
+              [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+              [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
+            },
+            {
+              [Modules.PRODUCT]: {
+                variant_id: product.variants[0].id,
+              },
+              [Modules.INVENTORY]: {
+                inventory_item_id: inventoryItem.id,
+              },
+            },
+          ])
+
+          shippingOption = (
+            await api.post(
+              `/admin/shipping-options`,
+              {
+                name: "Test shipping option",
+                service_zone_id: fulfillmentSet.service_zones[0].id,
+                shipping_profile_id: shippingProfile.id,
+                provider_id: "manual_test-provider",
+                price_type: "flat",
+                type: {
+                  label: "Test type",
+                  description: "Test description",
+                  code: "test-code",
+                },
+                prices: [
+                  { currency_code: "usd", amount: 1000 },
+                  { region_id: region.id, amount: 1100 },
+                ],
+                rules: [],
+              },
+              adminHeaders
+            )
+          ).data.shipping_option
+
+          paymentCollection = await paymentService.createPaymentCollections({
+            region_id: region.id,
+            amount: 1000,
+            currency_code: "usd",
+          })
+
+          paymentSession = await paymentService.createPaymentSession(
+            paymentCollection.id,
+            {
+              provider_id: "pp_system_default",
+              amount: 1000,
+              currency_code: "usd",
+              data: {},
+            }
+          )
+        })
+
+        it("should create an order and create item reservations", async () => {
+          const cart = (
+            await api.post(`/store/carts`, {
+              currency_code: "usd",
+              email: "tony@stark-industries.com",
+              shipping_address: {
+                address_1: "test address 1",
+                address_2: "test address 2",
+                city: "ny",
+                country_code: "us",
+                province: "ny",
+                postal_code: "94016",
+              },
+              sales_channel_id: salesChannel.id,
+              items: [{ quantity: 1, variant_id: product.variants[0].id }],
+            })
+          ).data.cart
+
+          const paymentCollection = (
+            await api.post(`/store/payment-collections`, {
+              cart_id: cart.id,
+              region_id: region.id,
+              currency_code: region.currency_code,
+              amount: cart.total,
+            })
+          ).data.payment_collection
+
+          await api.post(
+            `/store/payment-collections/${paymentCollection.id}/payment-sessions`,
+            { provider_id: "pp_system_default" }
+          )
+
+          const response = await api.post(
+            `/store/carts/${cart.id}/complete`,
+            {}
+          )
+
+          expect(response.status).toEqual(200)
+          expect(response.data).toEqual({
+            type: "order",
+            order: expect.objectContaining({
+              id: expect.any(String),
+              total: 106,
+              subtotal: 100,
+              tax_total: 6,
+              discount_total: 0,
+              discount_tax_total: 0,
+              original_total: 106,
+              original_tax_total: 6,
+              item_total: 106,
+              item_subtotal: 100,
+              item_tax_total: 6,
+              original_item_total: 106,
+              original_item_subtotal: 100,
+              original_item_tax_total: 6,
+              shipping_total: 0,
+              shipping_subtotal: 0,
+              shipping_tax_total: 0,
+              original_shipping_tax_total: 0,
+              original_shipping_tax_subtotal: 0,
+              original_shipping_total: 0,
+              items: [
+                expect.objectContaining({
+                  product_id: product.id,
+                  unit_price: 100,
+                  quantity: 1,
+                  tax_total: 6,
+                  subtotal: 100,
+                  total: 106,
+                  original_total: 106,
+                  discount_total: 0,
+                  tax_lines: [
+                    expect.objectContaining({
+                      rate: 6,
+                    }),
+                  ],
+                  adjustments: [],
+                }),
+              ],
+              shipping_address: expect.objectContaining({
+                city: "ny",
+                country_code: "us",
+                province: "ny",
+                postal_code: "94016",
+              }),
+            }),
+          })
+
+          const reservation = await api.get(`/admin/reservations`, adminHeaders)
+          const reservationItem = reservation.data.reservations[0]
+
+          expect(reservationItem).toEqual(
+            expect.objectContaining({
+              id: expect.stringContaining("resitem_"),
+              location_id: stockLocation.id,
+              inventory_item_id: inventoryItem.id,
+              quantity: cart.items[0].quantity,
+              line_item_id: cart.items[0].id,
+            })
+          )
+
+          const fullOrder = await api.get(
+            `/admin/orders/${response.data.order.id}`,
+            adminHeaders
+          )
+          const fullOrderDetail = fullOrder.data.order
+
+          expect(fullOrderDetail).toEqual(
+            expect.objectContaining({
+              payment_collections: [
+                expect.objectContaining({
+                  currency_code: "usd",
+                  amount: 106,
+                  status: "authorized",
+                }),
+              ],
+            })
+          )
+        })
+
+        it("should throw an error when payment collection isn't created", async () => {
+          const cart = (
+            await api.post(`/store/carts`, {
+              currency_code: "usd",
+              email: "tony@stark-industries.com",
+              sales_channel_id: salesChannel.id,
+              items: [{ quantity: 1, variant_id: product.variants[0].id }],
+            })
+          ).data.cart
+
+          const error = await api
+            .post(`/store/carts/${cart.id}/complete`, {})
+            .catch((e) => e)
+
+          expect(error.response.status).toEqual(400)
+          expect(error.response.data).toEqual({
+            type: "invalid_data",
+            message: "Payment collection has not been initiated for cart",
+          })
+        })
+
+        it("should throw an error when payment collection isn't created", async () => {
+          const cart = (
+            await api.post(`/store/carts`, {
+              currency_code: "usd",
+              email: "tony@stark-industries.com",
+              sales_channel_id: salesChannel.id,
+              items: [{ quantity: 1, variant_id: product.variants[0].id }],
+            })
+          ).data.cart
+
+          await api.post(`/store/payment-collections`, {
+            cart_id: cart.id,
+            region_id: region.id,
+            currency_code: region.currency_code,
+            amount: cart.total,
+          })
+
+          const error = await api
+            .post(`/store/carts/${cart.id}/complete`, {})
+            .catch((e) => e)
+
+          expect(error.response.status).toEqual(400)
+          expect(error.response.data).toEqual({
+            type: "invalid_data",
+            message: "Payment sessions are required to complete cart",
+          })
+        })
+
+        it("should return cart when payment authorization fails", async () => {
+          const authorizePaymentSessionSpy = jest.spyOn(
+            PaymentModuleService.prototype,
+            "authorizePaymentSession"
+          )
+
+          // Mock the authorizePaymentSession to throw error
+          authorizePaymentSessionSpy.mockImplementation(
+            (id, context, sharedContext) => {
+              throw new MedusaError(
+                MedusaError.Types.INVALID_DATA,
+                `Throw a random error`
+              )
+            }
+          )
+
+          const cart = (
+            await api.post(`/store/carts`, {
+              currency_code: "usd",
+              email: "tony@stark-industries.com",
+              shipping_address: {
+                address_1: "test address 1",
+                address_2: "test address 2",
+                city: "ny",
+                country_code: "us",
+                province: "ny",
+                postal_code: "94016",
+              },
+              sales_channel_id: salesChannel.id,
+              items: [{ quantity: 1, variant_id: product.variants[0].id }],
+            })
+          ).data.cart
+
+          const paymentCollection = (
+            await api.post(`/store/payment-collections`, {
+              cart_id: cart.id,
+              region_id: region.id,
+              currency_code: region.currency_code,
+              amount: cart.total,
+            })
+          ).data.payment_collection
+
+          await api.post(
+            `/store/payment-collections/${paymentCollection.id}/payment-sessions`,
+            { provider_id: "pp_system_default" }
+          )
+
+          const response = await api.post(
+            `/store/carts/${cart.id}/complete`,
+            {}
+          )
+
+          expect(response.status).toEqual(200)
+          expect(response.data).toEqual({
+            type: "cart",
+            cart: expect.objectContaining({}),
+            error: {
+              message: "Payment authorization failed",
+              name: "Error",
+              type: "payment_authorization_error",
+            },
+          })
         })
       })
     })

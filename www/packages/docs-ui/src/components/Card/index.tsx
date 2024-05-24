@@ -1,7 +1,7 @@
 import React from "react"
 import { ArrowUpRightOnBox } from "@medusajs/icons"
 import clsx from "clsx"
-import { LegacyLink } from "@/components"
+import { Link } from "@/components"
 
 export type CardProps = {
   startIcon?: React.ReactNode
@@ -13,6 +13,7 @@ export type CardProps = {
   contentClassName?: string
   children?: React.ReactNode
   showLinkIcon?: boolean
+  isExternal?: boolean
 }
 
 export const Card = ({
@@ -25,6 +26,7 @@ export const Card = ({
   contentClassName,
   children,
   showLinkIcon = true,
+  isExternal = false,
 }: CardProps) => {
   return (
     <div
@@ -57,10 +59,10 @@ export const Card = ({
             {showLinkIcon && (
               <ArrowUpRightOnBox className="text-medusa-fg-subtle min-w-[20px]" />
             )}
-            {/* TODO replace with Link once we move away from Docusaurus */}
-            <LegacyLink
+            <Link
               href={href}
               className="absolute left-0 top-0 h-full w-full rounded"
+              target={isExternal ? "_blank" : undefined}
             />
           </>
         )}

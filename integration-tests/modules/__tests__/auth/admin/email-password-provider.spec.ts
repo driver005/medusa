@@ -1,8 +1,11 @@
 import { ModuleRegistrationName } from "@medusajs/modules-sdk"
 import { IAuthModuleService, ICustomerModuleService } from "@medusajs/types"
 import Scrypt from "scrypt-kdf"
-import adminSeeder from "../../../../helpers/admin-seeder"
 import { medusaIntegrationTestRunner } from "medusa-test-utils"
+import {
+  adminHeaders,
+  createAdminUser,
+} from "../../../../helpers/create-admin-user"
 
 jest.setTimeout(50000)
 
@@ -23,7 +26,7 @@ medusaIntegrationTestRunner({
       })
 
       beforeEach(async () => {
-        await adminSeeder(dbConnection)
+        await createAdminUser(dbConnection, adminHeaders, appContainer)
       })
 
       const password = "supersecret"
@@ -40,14 +43,13 @@ medusaIntegrationTestRunner({
         await authService.create({
           provider: "emailpass",
           entity_id: email,
-          scope: "admin",
           provider_metadata: {
             password: passwordHash,
           },
         })
 
         const response = await api
-          .post(`/auth/admin/emailpass`, {
+          .post(`/auth/user/emailpass`, {
             email: email,
             password: password,
           })
@@ -72,14 +74,13 @@ medusaIntegrationTestRunner({
         await authService.create({
           provider: "emailpass",
           entity_id: email,
-          scope: "admin",
           provider_metadata: {
             password: passwordHash,
           },
         })
 
         const error = await api
-          .post(`/auth/admin/emailpass`, {
+          .post(`/auth/user/emailpass`, {
             email: email,
             password: "incorrect-password",
           })
@@ -98,7 +99,7 @@ medusaIntegrationTestRunner({
         ).toString("base64")
 
         const error = await api
-          .post(`/auth/admin/emailpass`, {
+          .post(`/auth/user/emailpass`, {
             email: "should-not-exist",
             password: "should-not-exist",
           })
